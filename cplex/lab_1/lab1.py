@@ -5,6 +5,7 @@ import itertools
 from igraph import Graph
 import numpy as np
 
+EPS = 1e-5
 
 def get_graph(path):
     assert path.endswith(".clq")
@@ -30,10 +31,9 @@ def get_graph(path):
 
 
 def read_files(data_path):
-    paths = [os.path.join(data_path, file) for file in os.listdir(data_path) if "brock" in file]
+    paths = sorted([os.path.join(data_path, file) for file in os.listdir(data_path) if "brock" in file])
     for path in paths[:1]:
         data = get_graph(path)
-        print(data)
     return data
 
 def get_constraint(ind, names, use_ind=True):
@@ -60,17 +60,14 @@ problem.objective.set_sense(problem.objective.sense.maximize)
 problem.variables.add(obj=obj,
                       lb=lower_bounds,
                       ub=upper_bounds,
-                      names=names)
+                      names=names,
+                      types=[problem.variables.type.binary]*len(lower_bounds)
+                      )
 
-# graph_matrix = np.array(graph.get_adjacency().data)
-# inverted = np.where(graph_matrix==1, 0, 1)
-
-# comb = list(itertools.combinations(names, 2))
-# inverted = set(itertools.combinations(range(200), 2)) - set(graph.get_edgelist())
-# inverted = list(inverted)
+for i in range(len(obj)):
+    problem.variables.set_types(i, problem.variables.type.binary)
 
 inverted = graph.complementer().get_edgelist()
-
 
 f_e = inverted[0]
 first_constraint = get_constraint(f_e, names, use_ind=False)
@@ -89,8 +86,11 @@ problem.linear_constraints.add(lin_expr = constraints,
                                rhs = rhs,
                                names = constraint_names)
 
-problem.set_problem_type(problem.problem_type.LP)
+
+problem.set_log_stream(None)
+problem.set_results_stream(None)
 problem.solve()
 
-print(problem.solution.get_values())
+solution = problem.solution.get_values()
 
+print(np.argwhere(np.array(solution) > 1-EPS))
